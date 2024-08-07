@@ -23,34 +23,21 @@ const SearchInput = () => {
 			setSearch("");
 		} else toast.error("No such user found!");
 	};
+
 	return (
-		<form onSubmit={handleSubmit} className='flex items-center gap-2'>
+		<form onSubmit={handleSubmit} className='flex items-center gap-2 p-2 bg-gray-800 rounded-full'>
 			<input
 				type='text'
 				placeholder='Search…'
-				className='input input-bordered rounded-full'
+				className='bg-gray-700 text-gray-200 placeholder-gray-500 rounded-full px-4 py-2 focus:outline-none'
 				value={search}
 				onChange={(e) => setSearch(e.target.value)}
 			/>
-			<button type='submit' className='btn btn-circle bg-sky-500 text-white'>
-				<IoSearchSharp className='w-6 h-6 outline-none' />
+			<button type='submit' className='bg-blue-500 p-2 rounded-full hover:bg-blue-600 transition duration-300'>
+				<IoSearchSharp className='w-6 h-6 text-white' />
 			</button>
 		</form>
 	);
 };
+
 export default SearchInput;
-
-// STARTER CODE SNIPPET
-// import { IoSearchSharp } from "react-icons/io5";
-
-// const SearchInput = () => {
-// 	return (
-// 		<form className='flex items-center gap-2'>
-// 			<input type='text' placeholder='Search…' className='input input-bordered rounded-full' />
-// 			<button type='submit' className='btn btn-circle bg-sky-500 text-white'>
-// 				<IoSearchSharp className='w-6 h-6 outline-none' />
-// 			</button>
-// 		</form>
-// 	);
-// };
-// export default SearchInput;

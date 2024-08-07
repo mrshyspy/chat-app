@@ -4,8 +4,9 @@ import Conversation from "./Conversation";
 
 const Conversations = () => {
 	const { loading, conversations } = useGetConversations();
+
 	return (
-		<div className='py-2 flex flex-col overflow-auto'>
+		<div className='py-2 flex flex-col overflow-auto bg-gray-900 h-full'>
 			{conversations.map((conversation, idx) => (
 				<Conversation
 					key={conversation._id}
@@ -15,25 +16,9 @@ const Conversations = () => {
 				/>
 			))}
 
-			{loading ? <span className='loading loading-spinner mx-auto'></span> : null}
+			{loading ? <span className='loading loading-spinner mx-auto text-gray-400'></span> : null}
 		</div>
 	);
 };
+
 export default Conversations;
-
-// STARTER CODE SNIPPET
-// import Conversation from "./Conversation";
-
-// const Conversations = () => {
-// 	return (
-// 		<div className='py-2 flex flex-col overflow-auto'>
-// 			<Conversation />
-// 			<Conversation />
-// 			<Conversation />
-// 			<Conversation />
-// 			<Conversation />
-// 			<Conversation />
-// 		</div>
-// 	);
-// };
-// export default Conversations;
