@@ -2,6 +2,8 @@ import path from "path";
 import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import { initializeProducer } from "./kafka.js";
+import { initializeConsumer } from "./kafka.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import messageRoutes from "./routes/message.routes.js";
@@ -31,5 +33,7 @@ app.get("*", (req, res) => {
 
 server.listen(PORT, () => {
 	connectToMongoDB();
+	initializeProducer();
+	initializeConsumer();
 	console.log(`Server Running on port ${PORT}`);
 });
