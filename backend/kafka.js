@@ -8,15 +8,17 @@ import Message from "./models/message.model.js";
 
 dotenv.config();
 
+const broker = process.env.BROKERS;
+console.log(broker);
 const kafka = new Kafka({
   clientId: 'chatApp',
-  brokers: ['kafka-16f53485-mrshyspy.j.aivencloud.com:11153'],
+  brokers: [process.env.brokers],
   ssl: {
     ca: [fs.readFileSync(path.resolve("./backend/ca.pem"), "utf-8")],
   },
   sasl: {
-    username: process.env.KAFKA_USERNAME || 'avnadmin',
-    password: process.env.KAFKA_PASSWORD || 'AVNS_04ZtWmwW8q-_j6Oi2Ny',
+    username: process.env.KAFKA_USERNAME,
+    password: process.env.KAFKA_PASSWORD ,
     mechanism: "plain",
   }
 });
@@ -31,6 +33,7 @@ const consumer = kafka.consumer({
 
 export async function initializeProducer() {
   try {
+    
     await producer.connect();
     console.log("Kafka producer connected");
   } catch (error) {
