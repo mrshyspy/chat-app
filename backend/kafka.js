@@ -5,20 +5,20 @@ import dotenv from 'dotenv';
 import Conversation from "./models/conversation.model.js"; 
 import Message from "./models/message.model.js";
 
-
 dotenv.config();
 
-const broker = process.env.BROKERS;
+// Use the correct casing for the environment variable
+const broker = process.env.BROKERS; 
 console.log(broker);
 const kafka = new Kafka({
   clientId: 'chatApp',
-  brokers: [process.env.brokers],
+  brokers: [broker],
   ssl: {
     ca: [fs.readFileSync(path.resolve("./backend/ca.pem"), "utf-8")],
   },
   sasl: {
     username: process.env.KAFKA_USERNAME,
-    password: process.env.KAFKA_PASSWORD ,
+    password: process.env.KAFKA_PASSWORD,
     mechanism: "plain",
   }
 });
@@ -26,14 +26,12 @@ const kafka = new Kafka({
 const producer = kafka.producer();
 const consumer = kafka.consumer({
   groupId: 'chat-consumer-group',
-  // Enable auto-commit and set commit interval
   autoCommit: true,
-  autoCommitInterval: 5000, // Commit every 5 seconds
+  autoCommitInterval: 5000,
 });
 
 export async function initializeProducer() {
   try {
-    
     await producer.connect();
     console.log("Kafka producer connected");
   } catch (error) {
@@ -61,52 +59,53 @@ export async function initializeConsumer() {
     await consumer.subscribe({ topic: 'chat-messages', fromBeginning: false });
 
     await consumer.run({
-      eachMessage: async ({  message, pause }) => {
-        const parsedMessage = JSON.parse(message.value.toString());
-        console.log(`Received message from Kafka:`, parsedMessage);
-
-        await saveMessageToDatabase(parsedMessage);
+      eachMessage: async ({ topic, partition, message }) => {
+        try {
+          const parsedMessage = JSON.parse(message.value.toString());
+          console.log(`Received message from Kafka:`, parsedMessage);
+          await saveMessageToDatabase(parsedMessage);
+        } catch (error) {
+          console.error("Error processing message:", error);
+          console.log("Pausing consumer for 60 seconds...");
+          await consumer.pause([{ topic: "chat-messages" }]);
+          setTimeout(async () => {
+            console.log("Resuming consumer...");
+            await consumer.resume([{ topic: "chat-messages" }]);
+          }, 60000);
+        }
       },
     });
   } catch (error) {
-    console.error("Error processing message:", error);
-    console.log("Pausing consumer for 60 seconds...");
-
-    // Pause the consumer and wait for 60 seconds
-    await consumer.pause([{ topic: "chat-messages" }]);
-    setTimeout(async () => {
-      console.log("Resuming consumer...");
-      await consumer.resume([{ topic: "chat-messages" }]);
-    }, 60000); // 60 seconds
+    console.error("Error connecting to Kafka consumer:", error);
   }
 }
 
 async function saveMessageToDatabase({ senderId, receiverId, message }) {
-    try {
-      let conversation = await Conversation.findOne({
-        participants: { $all: [senderId, receiverId] },
+  try {
+    let conversation = await Conversation.findOne({
+      participants: { $all: [senderId, receiverId] },
+    });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [senderId, receiverId],
       });
-  
-      if (!conversation) {
-        conversation = await Conversation.create({
-          participants: [senderId, receiverId],
-        });
-      }
-  
-      const newMessage = new Message({
-        senderId,
-        receiverId,
-        message,
-      });
-      await newMessage.save();
-      conversation.messages.push(newMessage._id);
-      await conversation.save();
-  
-      console.log("Message saved to database:", newMessage);
-    } catch (error) {
-      console.error("Error saving message to database:", error);
     }
+
+    const newMessage = new Message({
+      senderId,
+      receiverId,
+      message,
+    });
+    await newMessage.save();
+    conversation.messages.push(newMessage._id);
+    await conversation.save();
+
+    console.log("Message saved to database:", newMessage);
+  } catch (error) {
+    console.error("Error saving message to database:", error);
   }
+}
 
 export async function disconnectProducer() {
   await producer.disconnect();
@@ -117,3 +116,11 @@ export async function disconnectConsumer() {
   await consumer.disconnect();
   console.log("Kafka consumer disconnected");
 }
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log("Shutting down...");
+  await disconnectProducer();
+  await disconnectConsumer();
+  process.exit(0);
+});
