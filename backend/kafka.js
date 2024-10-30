@@ -2,6 +2,7 @@ import { Kafka } from "kafkajs";
 import fs from 'fs';
 import path from "path";
 import dotenv from 'dotenv';
+import { cacheMessage, getCachedMessage } from './chatService.js';
 import Conversation from "./models/conversation.model.js"; 
 import Message from "./models/message.model.js";
 
@@ -80,8 +81,18 @@ export async function initializeConsumer() {
   }
 }
 
+
+// In your saveMessageToDatabase function
 async function saveMessageToDatabase({ senderId, receiverId, message }) {
   try {
+    const messageId = `${senderId}-${receiverId}-${Date.now()}`;
+    const cachedMessage = await getCachedMessage(messageId);
+
+    if (cachedMessage) {
+      console.log("Message loaded from cache:", cachedMessage);
+      return; // Skip saving if message is already cached
+    }
+
     let conversation = await Conversation.findOne({
       participants: { $all: [senderId, receiverId] },
     });
@@ -101,11 +112,15 @@ async function saveMessageToDatabase({ senderId, receiverId, message }) {
     conversation.messages.push(newMessage._id);
     await conversation.save();
 
-    console.log("Message saved to database:", newMessage);
+    // Cache the newly saved message
+    await cacheMessage(messageId, { senderId, receiverId, message });
+
+    console.log("Message saved to database and cached:", newMessage);
   } catch (error) {
     console.error("Error saving message to database:", error);
   }
 }
+
 
 export async function disconnectProducer() {
   await producer.disconnect();
