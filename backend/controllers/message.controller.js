@@ -59,37 +59,66 @@ export const sendMessage = async (req, res) => {
 	}
 };
 
-export const getMessages = async (req, res) => {
-	try {
-	  const { id: userToChatId } = req.params;
-	  const senderId = req.user._id;
-	  const messageId = `messages:${senderId}:${userToChatId}`;
+// export const getMessages = async (req, res) => {
+// 	try {
+// 	  const { id: userToChatId } = req.params;
+// 	  const senderId = req.user._id;
+// 	  const messageId = `messages:${senderId}:${userToChatId}`;
   
-	  // Try to get messages from the cache
-	  const cachedMessages = await getCachedMessage(messageId);
-	  if (cachedMessages) {
-		console.log("Returning cached messages", cachedMessages);
-		return res.status(200).json(cachedMessages);
-	  }
+// 	  // Try to get messages from the cache
+// 	  const cachedMessages = await getCachedMessage(messageId);
+// 	  if (cachedMessages) {
+// 		console.log("Returning cached messages", cachedMessages);
+// 		return res.status(200).json(cachedMessages);
+// 	  }
   
-	  // If not cached, fetch messages from the database
-	  const conversation = await Conversation.findOne({
-		participants: { $all: [senderId, userToChatId] },
-	  }).populate("messages");
+// 	  // If not cached, fetch messages from the database
+// 	  const conversation = await Conversation.findOne({
+// 		participants: { $all: [senderId, userToChatId] },
+// 	  }).populate("messages");
   
-	  if (!conversation) {
-		return res.status(200).json([]);
-	  }
+// 	  if (!conversation) {
+// 		return res.status(200).json([]);
+// 	  }
   
-	  const messages = conversation.messages;
+// 	  const messages = conversation.messages;
   
-	  // Cache the messages for 1 hour
-	  await cacheMessage(messageId, messages);
+// 	  // Cache the messages for 1 hour
+// 	  await cacheMessage(messageId, messages);
   
-	  res.status(200).json(messages);
-	} catch (error) {
-	  console.log("Error in getMessages controller:", error.message);
-	  res.status(500).json({ error: "Internal server error" });
-	}
-  };
-  
+// 	  res.status(200).json(messages);
+// 	} catch (error) {
+// 	  console.log("Error in getMessages controller:", error.message);
+// 	  res.status(500).json({ error: "Internal server error" });
+// 	}
+//   };
+  export const getMessages = async (req, res) => {
+  try {
+    const { id: userToChatId } = req.params;
+    const senderId = req.user._id;
+    const messageId = `messages:${senderId}:${userToChatId}`;
+
+    // Step 1: Try to get cached messages from Redis
+    const cachedMessages = await getCachedMessage(messageId) || [];
+
+    // Immediately send cached messages to the client
+    res.status(200).json({ messages: cachedMessages });
+
+    // Step 2: Fetch old messages from the database asynchronously
+    const conversation = await Conversation.findOne({
+      participants: { $all: [senderId, userToChatId] },
+    }).populate("messages");
+
+    const oldMessages = conversation ? conversation.messages : [];
+
+    // Step 3: Combine cached messages with old messages
+    const allMessages = [...cachedMessages, ...oldMessages];
+
+    // Step 4: Cache the combined messages for future retrieval
+    await cacheMessage(messageId, allMessages);
+  } catch (error) {
+    console.log("Error in getMessages controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
