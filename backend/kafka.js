@@ -85,7 +85,7 @@ export async function initializeConsumer() {
 // In your saveMessageToDatabase function
 async function saveMessageToDatabase({ senderId, receiverId, message }) {
   try {
-    const messageId = `${senderId}-${receiverId}-${Date.now()}`;
+    const messageId = `messages:${senderId}:${receiverId}`;
     const cachedMessage = await getCachedMessage(messageId);
 
     if (cachedMessage) {
