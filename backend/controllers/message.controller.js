@@ -68,7 +68,7 @@ export const getMessages = async (req, res) => {
 	  // Try to get messages from the cache
 	  const cachedMessages = await getCachedMessage(messageId);
 	  if (cachedMessages) {
-		console.log("Returning cached messages");
+		console.log("Returning cached messages", cachedMessages);
 		return res.status(200).json(cachedMessages);
 	  }
   
