@@ -94,9 +94,9 @@ export const sendMessage = async (req, res) => {
 //   };
   export const getMessages = async (req, res) => {
   try {
-    const { id: userToChatId } = req.params;
+    const { id: receiverId } = req.params;
     const senderId = req.user._id;
-    const messageId = `messages:${senderId}:${userToChatId}`;
+    const messageId = `messages:${senderId}:${receiverId}`;
 
     // Step 1: Try to get cached messages from Redis
     const cachedMessages = await getCachedMessage(messageId) || [];
