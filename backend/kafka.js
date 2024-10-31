@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { cacheMessage, getCachedMessage } from './chatService.js';
 import Conversation from "./models/conversation.model.js"; 
 import Message from "./models/message.model.js";
+import redis from './redis.js';
 
 dotenv.config();
 
@@ -83,9 +84,10 @@ export async function initializeConsumer() {
 
 
 // In your saveMessageToDatabase function
+
 async function saveMessageToDatabase({ senderId, receiverId, message }) {
   try {
-    const messageId = `${senderId}-${receiverId}-${Date.now()}`;
+    const messageId = `messages:${senderId}:${receiverId}`;
     const cachedMessage = await getCachedMessage(messageId);
 
     if (cachedMessage) {

@@ -2,6 +2,8 @@ import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
 import { getReceiverSocketId, io } from "../socket/socket.js";
 import { produceMessage } from "../kafka.js";
+import { cacheMessage, getCachedMessage } from '../chatService.js';
+import redis from './redis.js';
 
 export const sendMessage = async (req, res) => {
 	try {
@@ -57,22 +59,99 @@ export const sendMessage = async (req, res) => {
 	}
 };
 
+
+// export const getMessages = async (req, res) => {
+// 	try {
+// 	  const { id: receiverId } = req.params;
+// 	  const senderId = req.user._id;
+// 	  const messageId = `messages:${senderId}:${receiverId}`;
+  
+// 	  // Try to get messages from the cache
+// 	  const cachedMessages = await getCachedMessage(messageId);
+// 	  if (cachedMessages) {
+// 		console.log("Returning cached messages", cachedMessages);
+// 		return res.status(200).json(cachedMessages);
+// 	  }
+  
+// 	  // If not cached, fetch messages from the database
+// 	  const conversation = await Conversation.findOne({
+// 		participants: { $all: [senderId, userToChatId] },
+// 	  }).populate("messages");
+  
+// 	  if (!conversation) {
+// 		return res.status(200).json([]);
+// 	  }
+  
+// 	  const messages = conversation.messages;
+  
+// 	  // Cache the messages for 1 hour
+// 	  await cacheMessage(messageId, messages);
+  
+// 	  res.status(200).json(messages);
+// 	} catch (error) {
+// 	  console.log("Error in getMessages controller:", error.message);
+// 	  res.status(500).json({ error: "Internal server error" });
+// 	}
+//   };
+  
 export const getMessages = async (req, res) => {
 	try {
-		const { id: userToChatId } = req.params;
-		const senderId = req.user._id;
-
-		const conversation = await Conversation.findOne({
-			participants: { $all: [senderId, userToChatId] },
-		}).populate("messages"); // NOT REFERENCE BUT ACTUAL MESSAGES
-
-		if (!conversation) return res.status(200).json([]);
-
-		const messages = conversation.messages;
-
-		res.status(200).json(messages);
+	  const { id: receiverId } = req.params;
+	  const senderId = req.user?._id;
+  
+	  if (!receiverId || !senderId) {
+		return res.status(400).json({ error: "Invalid sender or receiver ID" });
+	  }
+  
+	  const messageId = `messages:${senderId}:${receiverId}`;
+  
+	  // Try to get messages from the Redis list
+	  const cachedMessages = await redis.lrange(messageId, 0, -1); // Get all messages from the list
+	  if (cachedMessages.length > 0) {
+		const messages = cachedMessages.map((msg) => JSON.parse(msg));
+		console.log("Returning cached messages", messages);
+		return res.status(200).json(messages);
+	  }
+  
+	  // If not cached, fetch messages from the database
+	  const conversation = await Conversation.findOne({
+		participants: { $all: [senderId, receiverId] },
+	  }).populate("messages");
+  
+	  if (!conversation) {
+		return res.status(200).json([]);
+	  }
+  
+	  const messages = conversation.messages;
+  
+	  // Cache the messages in Redis list
+	  for (const msg of messages) {
+		await redis.lpush(messageId, JSON.stringify(msg)); // Push each message to the Redis list
+	  }
+  
+	  res.status(200).json(messages);
 	} catch (error) {
-		console.log("Error in getMessages controller: ", error.message);
-		res.status(500).json({ error: "Internal server error" });
+	  console.log("Error in getMessages controller:", error.message);
+	  res.status(500).json({ error: "Internal server error" });
 	}
-};
+  };
+  
+// export const getMessages = async (req, res) => {
+// 	try {
+// 		const { id: userToChatId } = req.params;
+// 		const senderId = req.user._id;
+
+// 		const conversation = await Conversation.findOne({
+// 			participants: { $all: [senderId, userToChatId] },
+// 		}).populate("messages"); // NOT REFERENCE BUT ACTUAL MESSAGES
+
+// 		if (!conversation) return res.status(200).json([]);
+
+// 		const messages = conversation.messages;
+
+// 		res.status(200).json(messages);
+// 	} catch (error) {
+// 		console.log("Error in getMessages controller: ", error.message);
+// 		res.status(500).json({ error: "Internal server error" });
+// 	}
+// };
