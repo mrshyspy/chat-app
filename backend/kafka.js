@@ -2,10 +2,9 @@ import { Kafka } from "kafkajs";
 import fs from 'fs';
 import path from "path";
 import dotenv from 'dotenv';
-import { cacheMessage, getCachedMessage } from './chatService.js';
+// import { cacheMessage, getCachedMessage } from './chatService.js';
 import Conversation from "./models/conversation.model.js"; 
 import Message from "./models/message.model.js";
-import redis from './redis.js';
 
 dotenv.config();
 
@@ -83,18 +82,49 @@ export async function initializeConsumer() {
 }
 
 
-// In your saveMessageToDatabase function
+
+// In your saveMessageToDatabase function (redis version)
+
+// async function saveMessageToDatabase({ senderId, receiverId, message }) {
+//   try {
+//     const messageId = `messages:${senderId}:${receiverId}`;
+//     const cachedMessage = await getCachedMessage(messageId);
+
+//     if (cachedMessage) {
+//       console.log("Message loaded from cache:", cachedMessage);
+//       return; // Skip saving if message is already cached
+//     }
+
+//     let conversation = await Conversation.findOne({
+//       participants: { $all: [senderId, receiverId] },
+//     });
+
+//     if (!conversation) {
+//       conversation = await Conversation.create({
+//         participants: [senderId, receiverId],
+//       });
+//     }
+
+//     const newMessage = new Message({
+//       senderId,
+//       receiverId,
+//       message,
+//     });
+//     await newMessage.save();
+//     conversation.messages.push(newMessage._id);
+//     await conversation.save();
+
+//     // Cache the newly saved message
+//     await cacheMessage(messageId, { senderId, receiverId, message });
+
+//     console.log("Message saved to database and cached:", newMessage);
+//   } catch (error) {
+//     console.error("Error saving message to database:", error);
+//   }
+// }
 
 async function saveMessageToDatabase({ senderId, receiverId, message }) {
   try {
-    const messageId = `messages:${senderId}:${receiverId}`;
-    const cachedMessage = await getCachedMessage(messageId);
-
-    if (cachedMessage) {
-      console.log("Message loaded from cache:", cachedMessage);
-      return; // Skip saving if message is already cached
-    }
-
     let conversation = await Conversation.findOne({
       participants: { $all: [senderId, receiverId] },
     });
@@ -114,15 +144,11 @@ async function saveMessageToDatabase({ senderId, receiverId, message }) {
     conversation.messages.push(newMessage._id);
     await conversation.save();
 
-    // Cache the newly saved message
-    await cacheMessage(messageId, { senderId, receiverId, message });
-
-    console.log("Message saved to database and cached:", newMessage);
+    console.log("Message saved to database:", newMessage);
   } catch (error) {
     console.error("Error saving message to database:", error);
   }
 }
-
 
 export async function disconnectProducer() {
   await producer.disconnect();
