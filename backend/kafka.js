@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { cacheMessage, getCachedMessage } from './chatService.js';
 import Conversation from "./models/conversation.model.js"; 
 import Message from "./models/message.model.js";
-import redis from './redis.js';
+import redis from '../redis.js';
 
 dotenv.config();
 
