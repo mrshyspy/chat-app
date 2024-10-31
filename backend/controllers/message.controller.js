@@ -3,11 +3,8 @@ import Message from "../models/message.model.js";
 import { getReceiverSocketId, io } from "../socket/socket.js";
 import { produceMessage } from "../kafka.js";
 import { cacheMessage, getCachedMessage } from '../chatService.js';
-<<<<<<< HEAD
-import redis from './redis.js';
-=======
+import redis from '../redis.js';
 
->>>>>>> deec378a334fb950344b9f8324d45171e7c14168
 
 export const sendMessage = async (req, res) => {
 	try {
