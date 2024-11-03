@@ -29,7 +29,7 @@ export const sendMessage = async (req, res) => {
             receiverId,
             message,
             conversationId: conversation._id,
-            createdAt: new Date().toISOString(),
+            createdAt: new Date().toISOString()
 
         };
 
