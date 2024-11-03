@@ -25,11 +25,11 @@ const Message = ({ message }) => {
 
 	return (
 		<div className={`chat ${chatClassName}`}>
-			<div className='chat-image avatar'>
+{/* 			<div className='chat-image avatar'>
 				<div className='w-10 rounded-full'>
 					<img alt='User avatar' src={profilePic} />
 				</div>
-			</div>
+			</div> */}
 			<div className={`chat-bubble text-white ${bubbleBgColor} ${shakeClass} p-3 rounded-xl`}>
 				{formattedMessage.map((line, index) => (
 					<p key={index} className="m-0">{line}</p>
