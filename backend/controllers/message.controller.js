@@ -29,6 +29,8 @@ export const sendMessage = async (req, res) => {
             receiverId,
             message,
             conversationId: conversation._id,
+            createdAt: new Date().toISOString(),
+
         };
 
         await produceMessage(messageData);
