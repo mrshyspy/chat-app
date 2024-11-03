@@ -57,8 +57,18 @@ export const getMessages = async (req, res) => {
         const messageId = `messages:${senderId}:${receiverId}`;
 
         const cachedMessages = await redis.lrange(messageId, 0, -1);
-        if (cachedMessages.length > 0) {
-            const messages = cachedMessages.map((msg) => JSON.parse(msg));
+        const messages = [];
+        for (const msg of cachedMessages) {
+            try {
+                messages.push(JSON.parse(msg));
+            } catch (parseError) {
+                console.error("Failed to parse cached message:", parseError);
+                // Remove corrupted message from Redis
+                await redis.lrem(messageId, 1, msg);
+            }
+        }
+
+        if (messages.length > 0) {
             console.log("Returning cached messages");
             return res.status(200).json(messages);
         }
@@ -71,12 +81,11 @@ export const getMessages = async (req, res) => {
             return res.status(200).json([]); // No conversation means no messages
         }
 
-        const messages = conversation.messages;
-        for (const msg of messages) {
+        for (const msg of conversation.messages) {
             await redis.lpush(messageId, JSON.stringify(msg)); // Cache messages
         }
 
-        res.status(200).json(messages);
+        res.status(200).json(conversation.messages);
     } catch (error) {
         console.error("Error in getMessages controller:", error);
         res.status(500).json({ error: "Internal server error", details: error.message });
