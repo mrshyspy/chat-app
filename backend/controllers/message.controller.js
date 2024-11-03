@@ -85,6 +85,9 @@ export const getMessages = async (req, res) => {
             await redis.lpush(messageId, JSON.stringify(msg)); // Cache messages
         }
 
+        console.log("Cached all the messages in redis");
+
+
         res.status(200).json(conversation.messages);
     } catch (error) {
         console.error("Error in getMessages controller:", error);
