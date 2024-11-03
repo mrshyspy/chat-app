@@ -120,13 +120,13 @@ async function saveMessageToDatabase({ senderId, receiverId, message }) {
       message,
     });
     await newMessage.save();
-    
+
     conversation.messages.push(newMessage._id);
     await conversation.save();
 
     console.log("Message successfully saved to database:", newMessage._id);
     const messageId = `messages:${senderId}:${receiverId}`;
-    await redis.lpush(messageId, JSON.stringify(newMessage[0]));
+    await redis.lpush(messageId, JSON.stringify(newMessage));
     await redis.expire(messageId, 86400); // Expire cache after 1 day
   } catch (error) {
     console.error("Error saving message to database:", error.message || error);
