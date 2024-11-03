@@ -8,8 +8,6 @@ redis.on('connect', () => {
 redis.on('error', (error) => {
   console.error('Redis connection error:', error);
 });
-redis.on('connect', () => {
-  console.log("Successfully connected to Redis");
-});
+
 
 export default redis;

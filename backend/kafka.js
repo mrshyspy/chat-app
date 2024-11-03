@@ -2,15 +2,20 @@ import { Kafka } from "kafkajs";
 import fs from 'fs';
 import path from "path";
 import dotenv from 'dotenv';
-// import { cacheMessage, getCachedMessage } from './chatService.js';
 import Conversation from "./models/conversation.model.js"; 
 import Message from "./models/message.model.js";
+import redis from './redis.js';
 
 dotenv.config();
+// if (redis.status !== "ready") {
+//   console.error("Redis is not ready. Please check the connection.");
+//   // Optionally, add a retry logic here
+// }
 
-// Use the correct casing for the environment variable
-const broker = process.env.BROKERS; 
-console.log(broker);
+// Set up broker and Kafka configuration
+const broker = process.env.BROKERS;
+console.log("Kafka broker:", broker);
+
 const kafka = new Kafka({
   clientId: 'chatApp',
   brokers: [broker],
@@ -21,14 +26,14 @@ const kafka = new Kafka({
     username: process.env.KAFKA_USERNAME,
     password: process.env.KAFKA_PASSWORD,
     mechanism: "plain",
-  }
+  },
 });
 
 const producer = kafka.producer();
 const consumer = kafka.consumer({
   groupId: 'chat-consumer-group',
   autoCommit: true,
-  autoCommitInterval: 5000,
+  autoCommitInterval: 5000, // Commit every 5 seconds
 });
 
 export async function initializeProducer() {
@@ -58,95 +63,73 @@ export async function initializeConsumer() {
     console.log("Kafka consumer connected");
 
     await consumer.subscribe({ topic: 'chat-messages', fromBeginning: false });
+    console.log("Subscribed to topic: chat-messages");
 
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
         try {
-          const parsedMessage = JSON.parse(message.value.toString());
+          const messageValue = message.value?.toString();
+          if (!messageValue) {
+            console.error("Empty message received from Kafka");
+            return;
+          }
+
+          const parsedMessage = JSON.parse(messageValue);
           console.log(`Received message from Kafka:`, parsedMessage);
+
+          // Save the message to the database
           await saveMessageToDatabase(parsedMessage);
         } catch (error) {
           console.error("Error processing message:", error);
-          console.log("Pausing consumer for 60 seconds...");
-          await consumer.pause([{ topic: "chat-messages" }]);
-          setTimeout(async () => {
+
+          // Pause consumer for 60 seconds on error
+          console.log("Pausing consumer for 60 seconds due to error...");
+          consumer.pause([{ topic: "chat-messages" }]);
+
+          setTimeout(() => {
             console.log("Resuming consumer...");
-            await consumer.resume([{ topic: "chat-messages" }]);
-          }, 60000);
+            consumer.resume([{ topic: "chat-messages" }]);
+          }, 60000); // 60 seconds
         }
       },
     });
   } catch (error) {
-    console.error("Error connecting to Kafka consumer:", error);
+    console.error("Error connecting Kafka consumer:", error);
   }
 }
 
-
-
-// In your saveMessageToDatabase function (redis version)
-
-// async function saveMessageToDatabase({ senderId, receiverId, message }) {
-//   try {
-//     const messageId = `messages:${senderId}:${receiverId}`;
-//     const cachedMessage = await getCachedMessage(messageId);
-
-//     if (cachedMessage) {
-//       console.log("Message loaded from cache:", cachedMessage);
-//       return; // Skip saving if message is already cached
-//     }
-
-//     let conversation = await Conversation.findOne({
-//       participants: { $all: [senderId, receiverId] },
-//     });
-
-//     if (!conversation) {
-//       conversation = await Conversation.create({
-//         participants: [senderId, receiverId],
-//       });
-//     }
-
-//     const newMessage = new Message({
-//       senderId,
-//       receiverId,
-//       message,
-//     });
-//     await newMessage.save();
-//     conversation.messages.push(newMessage._id);
-//     await conversation.save();
-
-//     // Cache the newly saved message
-//     await cacheMessage(messageId, { senderId, receiverId, message });
-
-//     console.log("Message saved to database and cached:", newMessage);
-//   } catch (error) {
-//     console.error("Error saving message to database:", error);
-//   }
-// }
-
+// Save the message to the database
 async function saveMessageToDatabase({ senderId, receiverId, message }) {
   try {
+    console.log("Attempting to find conversation...");
     let conversation = await Conversation.findOne({
       participants: { $all: [senderId, receiverId] },
     });
 
     if (!conversation) {
+      console.log("Conversation not found, creating a new one...");
       conversation = await Conversation.create({
         participants: [senderId, receiverId],
       });
     }
 
+    console.log("Saving new message...");
     const newMessage = new Message({
       senderId,
       receiverId,
       message,
     });
     await newMessage.save();
+    
     conversation.messages.push(newMessage._id);
     await conversation.save();
 
-    console.log("Message saved to database:", newMessage);
+    console.log("Message successfully saved to database:", newMessage._id);
+    const messageId = `messages:${senderId}:${receiverId}`;
+    await redis.lpush(messageId, JSON.stringify(newMessage[0]));
+    await redis.expire(messageId, 86400); // Expire cache after 1 day
   } catch (error) {
-    console.error("Error saving message to database:", error);
+    console.error("Error saving message to database:", error.message || error);
   }
 }
 
@@ -162,7 +145,7 @@ export async function disconnectConsumer() {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log("Shutting down...");
+  console.log("Shutting down gracefully...");
   await disconnectProducer();
   await disconnectConsumer();
   process.exit(0);
