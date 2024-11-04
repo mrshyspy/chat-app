@@ -1,4 +1,4 @@
-# MERN Stack Project: Real-Time Chat Application with JWT and Socket.io
+# MERN Stack Project: Real-Time Chat Application with MERN,Socket.io, Redis, Kafka And JWT 
 
 ![Demo App](./frontend/public/chat-app-.png)
 
